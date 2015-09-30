@@ -1,0 +1,6 @@
+*.swp
+.R*
+.ipynb_checkpoints
+*.bam
+*.bai
+insert-sizer
