@@ -33,10 +33,8 @@ protected:
     BamTools::BamReader     _bam;
     std::map<size_t, size_t>
                             _histogram;
-    std::map<size_t, std::map<size_t, size_t>>
+    std::map<int32_t, std::map<size_t, std::map<size_t, size_t>>>
                             _locus_sizes;
-    std::map<std::string, size_t>
-                            _names;
     size_t                  _num_alignments;  // All alignments, good or bad.
     size_t                  _num_paired_alignments;  // Good, PE alignments.
     size_t                  _num_merged_alignments;  // Good, SE merged reads.
@@ -87,16 +85,18 @@ _add_alignment(BamTools::BamAlignment &aln)
     if (aln.InsertSize > 0) {
         // InsertSize > 0 is true IFF read is paired, both pairs map and this
         // is the first of the pairs.
+        if (aln.RefID != aln.MateRefID) {
+            return;
+        }
 #if 0
-        _names[aln.Name] += 1;
-        std::cerr << aln.Name << " " << _names[aln.Name] << " ";
+        std::cerr << aln.Name << " " << aln.RefID << " " << aln.MateRefID << " ";
         std::cerr << aln.Position << " ";
         std::cerr << "pair -- P: " << aln.IsPaired() << " IS: " << aln.InsertSize << std::endl;
 #endif
 
         _num_paired_alignments++;
         _histogram[aln.InsertSize] += 1;
-        _locus_sizes[aln.Position][aln.InsertSize] += 1;
+        _locus_sizes[aln.RefID][aln.Position][aln.InsertSize] += 1;
         return;
     }
 #if 0
@@ -130,29 +130,31 @@ report()
     cout << _num_merged_alignments << " were merged." << endl;
 #endif
 
-    cout << "Locus\tSize\tNumTags\tModeSizeNumTags" << endl;
-    for (auto &pair: _locus_sizes) {
-        size_t              locus = pair.first;
-        std::map<size_t, size_t> counts = pair.second;
-        size_t              locus_count = 0;
-        size_t              mode_size = 0;
-        size_t              max_count = 0;
-        for (auto &countpair: counts) {
-            size_t size = countpair.first;
-            size_t count = countpair.second;
+    cout << "RefID\tLocus\tSize\tNumTags\tModeSizeNumTags" << endl;
+    for (auto &refpair: _locus_sizes) {
+        int32_t             ref = refpair.first;
+        for (auto &pair: refpair.second) {
+            size_t              locus = pair.first;
+            std::map<size_t, size_t>
+                                counts = pair.second;
+            size_t              locus_count = 0;
+            size_t              mode_size = 0;
+            size_t              max_count = 0;
+            for (auto &countpair: counts) {
+                size_t size = countpair.first;
+                size_t count = countpair.second;
 
-            locus_count += count;
-            if (max_count < count) {
-                mode_size = size;
-                max_count = count;
+                locus_count += count;
+                if (max_count < count) {
+                    mode_size = size;
+                    max_count = count;
+                }
+
             }
-
-        }
-        if (max_count > 1) {
-            cout << locus << "\t" << mode_size << "\t" << locus_count  << "\t"
-                 << max_count << endl;
-            //cout << "Locus " << locus << " of " << mode_size << "bp with " <<
-            //    locus_count  << " tags (" << max_count  << ")" << endl;
+            if (max_count > 1) {
+                cout << ref << "\t" << locus << "\t" << mode_size << "\t" <<
+                        locus_count  << "\t" << max_count << endl;
+            }
         }
     }
     return true;
